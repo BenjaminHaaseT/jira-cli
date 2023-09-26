@@ -15,6 +15,7 @@ impl PartialEq for Status {
             (Status::Open, Status::Open) => true,
             (Status::InProgress, Status::InProgress) => true,
             (Status::Resolved, Status::Resolved) => true,
+            (Status::Closed, Status::Closed) => true,
             (_, _) => false
         }
     }

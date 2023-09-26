@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use tempfile;
 use std::fs::{self, OpenOptions, File};
 use std::io::{Read, Write, BufRead, BufReader, BufWriter};
@@ -30,23 +30,68 @@ impl JiraDatabase {
     }
 
     pub fn create_story(&self, story: Story, epic_id: u32) -> Result<u32> {
-
+        let mut db_state = self.read_db()?;
+        let id = db_state.last_item_id;
+        let epic = db_state.epics
+            .get_mut(&epic_id)
+            .ok_or(anyhow!(format!("no epic with id: {epic_id}")))?;
+        epic.stories.push(id + 1);
+        db_state.stories.insert(id + 1, story);
+        db_state.last_item_id += 1;
+        self.database.write_db(&db_state)?;
+        Ok(db_state.last_item_id)
     }
 
     pub fn delete_epic(&self, epic_id: u32) -> Result<()> {
-        todo!()
+        let mut db_state = self.read_db()?;
+        let mut epic = db_state.epics
+            .get_mut(&epic_id)
+            .ok_or(anyhow!(format!("no epic with id: {epic_id}")))?;
+        while let Some(story_id) = epic.stories.pop() {
+            db_state.stories.remove(&story_id);
+        }
+        db_state.epics.remove(&epic_id);
+        self.database.write_db(&db_state)?;
+        Ok(())
     }
 
-    pub fn delete_story(&self,epic_id: u32, story_id: u32) -> Result<()> {
-        todo!()
+    pub fn delete_story(&self, epic_id: u32, story_id: u32) -> Result<()> {
+        let mut db_state = self.read_db()?;
+        let mut epic = db_state.epics
+            .get_mut(&epic_id)
+            .ok_or(anyhow!(format!("no epic with id: {epic_id}")))?;
+        let mut found = None;
+        for (i, id) in epic.stories.iter().enumerate() {
+            if *id == story_id {
+                found = Some(i);
+            }
+        }
+        if let Some(found_idx) = found {
+            epic.stories.remove(found_idx);
+        } else {
+            return Err(anyhow!(format!("no story with id: {story_id} found for epic: {epic_id}")));
+        }
+        db_state.stories.remove(&story_id);
+        self.database.write_db(&db_state)?;
+        Ok(())
     }
 
     pub fn update_epic_status(&self, epic_id: u32, status: Status) -> Result<()> {
-        todo!()
+        let mut db_state = self.read_db()?;
+        let mut epic = db_state.epics
+            .get_mut(&epic_id)
+            .ok_or(anyhow!(format!("no epic with id: {epic_id}")))?;
+        epic.status = status;
+        self.database.write_db(&db_state)
     }
 
     pub fn update_story_status(&self, story_id: u32, status: Status) -> Result<()> {
-        todo!()
+        let mut db_state = self.read_db()?;
+        let mut story = db_state.stories
+            .get_mut(&story_id)
+            .ok_or(anyhow!(format!("no story with id: {story_id}")))?;
+        story.status = status;
+        self.database.write_db(&db_state)
     }
 }
 trait Database {

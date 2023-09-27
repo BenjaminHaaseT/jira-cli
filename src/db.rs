@@ -7,7 +7,7 @@ pub use crate::models::{DBState, Epic, Story, Status};
 
 
 pub struct JiraDatabase {
-    database: Box<dyn Database>,
+    pub database: Box<dyn Database>,
 }
 
 impl JiraDatabase {
@@ -94,12 +94,12 @@ impl JiraDatabase {
         self.database.write_db(&db_state)
     }
 }
-trait Database {
+pub trait Database {
     fn read_db(&self) -> Result<DBState>;
     fn write_db(&self, db_state: &DBState) -> Result<()>;
 }
 
-struct JSONFileDatabase {
+pub struct JSONFileDatabase {
     pub file_path: String
 }
 

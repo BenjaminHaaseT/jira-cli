@@ -1,10 +1,12 @@
 use std::rc::Rc;
 use itertools::Itertools;
+use itertools::sorted;
 use anyhow::Result;
 use anyhow::anyhow;
+use std::str::FromStr;
 
 use crate::db::JiraDatabase;
-use crate::models::Action;
+use crate::models::{Action, Epic, Story, Status};
 
 mod page_helpers;
 use page_helpers::*;
@@ -20,10 +22,25 @@ pub struct HomePage {
 
 impl Page for HomePage {
     fn draw_page(&self) -> Result<()> {
+        let id_width = "     id     |".len();
+        let name_width = "|               name               |".len();
+        let status_width = "|      status      ".len();
+        let db_state = self.db.read_db()?;
+        let mut epics = db_state.epics.iter().collect::<Vec<(&u32, &Epic)>>();
+        epics.sort_by_key(|(id, _)| *id);
         println!("----------------------------- EPICS -----------------------------");
         println!("     id     |               name               |      status      ");
-
-        // TODO: print out epics using get_column_string(). also make sure the epics are sorted by id
+        for (id, epic) in epics{
+            let id = id.to_string();
+            let name = epic.name.clone();
+            let status = epic.status.to_string();
+            println!(
+                "{}{}{}",
+                get_column_string(&id, id_width),
+                get_column_string(&name, name_width),
+                get_column_string(&status, status_width)
+            );
+        }
 
         println!();
         println!();
@@ -34,7 +51,21 @@ impl Page for HomePage {
     }
 
     fn handle_input(&self, input: &str) -> Result<Option<Action>> {
-        todo!() // match against the user input and return the corresponding action. If the user input was invalid return None.
+        match input {
+            "q" => Ok(Some(Action::Exit)),
+            "c" => Ok(Some(Action::CreateEpic)),
+            s => match u32::from_str(s) {
+                Ok(id) => {
+                    let db_state = self.db.database.read_db()?;
+                    if db_state.epics.contains_key(&id) {
+                        Ok(Some(Action::NavigateToEpicDetail {epic_id: id}))
+                    } else {
+                        Ok(None)
+                    }
+                }
+                Err(_) => Ok(None)
+            }
+        }
     }
 }
 
@@ -47,20 +78,52 @@ impl Page for EpicDetail {
     fn draw_page(&self) -> Result<()> {
         let db_state = self.db.read_db()?;
         let epic = db_state.epics.get(&self.epic_id).ok_or_else(|| anyhow!("could not find epic!"))?;
+        let id = self.epic_id.to_string();
+        let id_width = "  id  |".len();
+        let name = epic.name.as_str();
+        let name_width = "|     name     |".len();
+        let description = epic.description.as_str();
+        let description_width = "|         description         |".len();
+        let status = epic.status.to_string();
+        let status_width = "|    status    ".len();
 
         println!("------------------------------ EPIC ------------------------------");
         println!("  id  |     name     |         description         |    status    ");
 
-        // TODO: print out epic details using get_column_string()
+        println!(
+            "{}{}{}{}",
+            get_column_string(&id, id_width),
+            get_column_string(name, name_width),
+            get_column_string(description, description_width),
+            get_column_string(&status, status_width),
+        );
 
         println!();
 
         println!("---------------------------- STORIES ----------------------------");
         println!("     id     |               name               |      status      ");
 
+        let story_id_width = "     id     |".len();
+        let story_name_width = "|               name               |".len();
+        let story_status_width = "|      status      ".len();
         let stories = &db_state.stories;
+        let mut story_iter = epic.stories
+            .iter()
+            .map(|story_id| {
+                Ok((story_id, stories.get(story_id).ok_or(anyhow!("could not find story with id: {story_id}"))?))
+        })
+            .collect::<Result<Vec<(&u32, &Story)>>>()?;
+        story_iter.sort_by_key(|(&id, _)| id);
 
-        // TODO: print out stories using get_column_string(). also make sure the stories are sorted by id
+        for (id, story) in story_iter {
+            let status = story.status.to_string();
+            println!(
+                "{}{}{}",
+                get_column_string(id.to_string().as_str(), story_id_width),
+                get_column_string(story.name.as_str(), story_name_width),
+                get_column_string(&status, story_status_width),
+            );
+        }
 
         println!();
         println!();
@@ -100,7 +163,7 @@ impl Page for StoryDetail {
     }
 
     fn handle_input(&self, input: &str) -> Result<Option<Action>> {
-        todo!() // match against the user input and return the corresponding action. If the user input was invalid return None.
+        todo!()
     }
 }
 

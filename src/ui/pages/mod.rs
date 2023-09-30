@@ -63,7 +63,7 @@ impl Page for HomePage {
                         Ok(None)
                     }
                 }
-                Err(_) => Ok(None)
+                Err(e) => Ok(None)
             }
         }
     }
@@ -145,7 +145,7 @@ impl Page for EpicDetail {
                 match u32::from_str(s) {
                     Ok(id) if epic.stories.contains(&id) => Ok(Some(Action::NavigateToStoryDetail {epic_id: self.epic_id, story_id: id})),
                     Ok(_) => Ok(None),
-                    Err(id) => return Err(anyhow!("invalid story id: {}", id))
+                    Err(_id) => Ok(None),
                 }
             }
         }
@@ -162,9 +162,24 @@ impl Page for StoryDetail {
     fn draw_page(&self) -> Result<()> {
         let db_state = self.db.read_db()?;
         let story = db_state.stories.get(&self.story_id).ok_or_else(|| anyhow!("could not find story!"))?;
+        let id_width = "  id  |".len();
+        let name_width = "|     name     |".len();
+        let description_width = "|         description         |".len();
+        let status_width = "|    status    ".len();
+        let id = self.story_id.to_string();
+        let name = story.name.as_str();
+        let description = story.description.as_str();
+        let status = story.status.to_string();
 
         println!("------------------------------ STORY ------------------------------");
         println!("  id  |     name     |         description         |    status    ");
+        println!(
+            "{}{}{}{}",
+            get_column_string(&id, id_width),
+            get_column_string(name, name_width),
+            get_column_string(description, description_width),
+            get_column_string(&status, status_width),
+        );
 
         // TODO: print out story details using get_column_string()
 
@@ -177,7 +192,12 @@ impl Page for StoryDetail {
     }
 
     fn handle_input(&self, input: &str) -> Result<Option<Action>> {
-        todo!()
+        match input {
+            "p" => Ok(Some(Action::NavigateToPreviousPage)),
+            "u" => Ok(Some(Action::UpdateStoryStatus {story_id: self.story_id})),
+            "d" => Ok(Some(Action::DeleteStory {epic_id: self.epic_id, story_id: self.story_id})),
+            _ => Ok(None),
+        }
     }
 }
 
@@ -250,6 +270,7 @@ mod tests {
         fn handle_input_should_not_throw_error() {
             let db = Rc::new(JiraDatabase { database: Box::new(MockDB::new()) });
             let epic_id = db.create_epic(Epic::new("".to_owned(), "".to_owned())).unwrap();
+            println!("{}", epic_id);
 
             let page = EpicDetail { epic_id, db };
             assert_eq!(page.handle_input("").is_ok(), true);

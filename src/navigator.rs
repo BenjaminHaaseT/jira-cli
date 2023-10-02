@@ -67,6 +67,7 @@ impl Navigator {
                 // prompt the user to delete the epic and persist it in the database
                 if self.prompts.delete_epic.as_ref()() {
                     self.db.delete_epic(epic_id)?;
+                    self.pages.pop();
                 }
             }
             Action::CreateStory { epic_id } => {
@@ -83,6 +84,7 @@ impl Navigator {
                 // prompt the user to delete the story and persist it in the database
                 if self.prompts.delete_story.as_ref()() {
                     self.db.delete_story(epic_id, story_id)?;
+                    self.pages.pop();
                 }
             }
             Action::Exit => {
